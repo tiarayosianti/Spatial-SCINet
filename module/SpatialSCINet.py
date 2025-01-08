@@ -1,3 +1,6 @@
+import tensorflow as tf
+import numpy as np
+
 # Splitting layer:
 splitting_layer = tf.keras.layers.Lambda(lambda x: (x[:, ::2, :],
                                                     x[:, 1::2, :]))
