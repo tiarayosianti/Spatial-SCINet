@@ -227,3 +227,179 @@ class SCINet(tf.keras.layers.Layer):
         x = self.projection1(x)
         x = tf.transpose(x, perm = [0, 2, 1]) # Turn again to BATCH-TIME-CHANNELS
         return x
+
+def scinet_builder( output_len: list,
+                    input_len: int,
+                    output_dim: list,
+                    input_dim: int,
+                    selected_columns: list,
+                    loss_weights: list,
+                    hid_size = 1,
+                    num_levels = 4,
+                    kernel = 5,
+                    dropout = 0.5,
+                    learning_rate = 0.01,
+                    probabilistic = False
+                ):
+
+    '''
+    Returns a compiled SCINet model.
+
+    Arguments:
+    ----------
+    output_len: list
+        Length of the output in each SCINet. If just one SCINet [n] where
+        n is the lenght.
+
+    input_len: int
+        Length of the input of the *first* SCINet. Subsequent ones are
+        determined by previous output length.
+
+    output_dim: list
+        Dimensionality of the output of each SCINet. If just one SCINet [n]
+        where n is the number of dimensions.
+
+    input_dim: int
+        Dimensionality of of the *first* SCINet. Subsequent ones are
+        determined by previous output dim.
+
+    selected_columns: list (or None)
+        The index of the columns used to calculate the loss for a particular
+        SCINet. When the output_dim != from input_dim the loss of the output
+        must be calculated with a subset of the input.
+        It must be a list with the lists of columns used to calculate the loss
+        on each SCINet. For instance, for 3 SCINet:
+            [[1,2,3], [1,2,3], [2]]
+
+    loss_weight: list
+        Relative importance of the loss for the output of each SCINet.
+
+    hid_size: int
+        Number of filters, applicable to all SCINet.
+
+    num_levels: int
+        Number of splits, applicable to all SCINet.
+
+    kernel: int
+        Kernel size, applicable to all SCINet.
+
+    dropout: float
+        Dropout rate, applicable to all SCINet.
+
+    learning_rate: float
+        Learning rate for ADAM.
+
+    '''
+    # Num examples needed in the case of using probabilistic layer.
+    print('Building model...')
+    assert len(output_dim) == len(output_len), "output_dim list does not equal length output_len"
+    assert input_len % 2**num_levels == 0, f"input_len (X_LEN) does not match depth {input_len} % 2**{num_levels} != 0"
+    assert (input_len / 2**num_levels) % 2 == 0 , f"input_len (X_LEN) does not match depth. {input_len} / 2**{num_levels} must be even!"
+
+    if selected_columns is not None:
+        assert all([output_dim[i] == len(selected_columns[i])
+            for i in range(len(output_dim))]), 'Output_dims and selected columns do not correspond' #Making sure inputs are coherent
+
+    inputs = tf.keras.Input(shape = (input_len, input_dim)) # window size, fwature * channel
+
+    X = inputs
+    outputs = []
+    # Loop over the number of output dimensions provided, if just one [x]
+    # is provided, it has just one stack.
+    input_dims = [input_dim] + output_dim
+
+
+    for i in range(len(output_dim)):
+
+        assert X.shape[1] == input_len # Sanity check
+
+        x_mid = SCINet(output_len= output_len[i],
+                    input_len= input_len,
+                    input_dim = input_dims[i],
+                    num_levels = num_levels,
+                    kernel= kernel,
+                    hid_size = hid_size,
+                    output_dim= output_dim[i],
+                    dropout= dropout,
+                    name = f'Block_{i}')(X)
+
+        outputs.append(x_mid)
+        if i == (len(output_dim) - 1):
+            break
+
+        if selected_columns is not None: # If input dim != output dime
+            int_inputs = tf.gather(inputs, selected_columns[i], axis = 2)
+        else:
+            int_inputs = inputs
+
+        new_input = tf.concat([int_inputs, x_mid], 1)
+        X = tf.keras.layers.Cropping1D((output_len[i], 0))(new_input)
+        # Removing "old" prices first
+
+    model = tf.keras.Model(inputs = inputs, outputs = outputs)
+    model.compile(optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate),
+         loss = {f'Block_{i}':"mae" for i in range(len(output_dim))},
+            loss_weights = loss_weights)
+
+    return model
+
+# Define the module Conv2D_SCINet
+class Conv2D_SCINet(tf.keras.Model):
+
+    def __init__(self, filters, kernel_size,
+                 output_len, input_len, output_dim, input_dim, x_features, locations,
+                 selected_columns, probabilistic,
+                 loss_weights, learning_rate, activation_func,
+                 num_levels, kernel, hid_size, dropout):
+        super(Conv2D_SCINet, self).__init__()
+
+        self.input_len = input_len
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.learning_rate = learning_rate
+        self.loss_weights = loss_weights
+
+        # Conv2D layers for spatial pattern learning
+        self.conv2d_layers = tf.keras.Sequential([
+            layers.Conv2D(filters=filters[0], kernel_size=kernel_size, activation = activation_func[0], padding='same'),
+            layers.Dropout(0.5),
+            layers.Conv2D(filters=filters[1], kernel_size=kernel_size, activation = activation_func[1], padding='same'),
+            layers.Dropout(0.5),
+            # Reshape the output
+            layers.Flatten(),
+            layers.Dense(input_len * input_dim), # output layer
+            layers.Reshape((input_len, input_dim)) # reshape output
+        ]) # input_len = X_train.shape[1] (window size), input_dim = X_train.shape[2] * X_train.shape[3]
+
+        self.scinet_layers = scinet_builder(
+                    output_len = output_len,
+                    input_len = input_len,
+                    output_dim = output_dim,
+                    input_dim = input_dim,
+                    selected_columns = selected_columns,
+                    loss_weights = loss_weights,
+                    hid_size = hid_size,
+                    num_levels = num_levels,
+                    kernel = kernel,
+                    dropout = dropout,
+                    learning_rate = learning_rate,
+                    probabilistic = False)
+
+        self.inputs = tf.keras.Input(shape=(input_len, x_features, locations))
+                   # x_features = X_train.shape[2], locations = X_train.shape[3]
+                   # [ window size, feature, channel ] -> [ input len, X_train.shape[2], X_train.shape[3] ]
+                   # input len = X_LEN = window size = X_train.shape[1]
+                   # input_dim = X_train.shape[2] * X_train.shape[3]
+                   # X_train.shape : 4D that is [ samples, window size, feature, channel ] with indexes 0, 1, 2, 3
+                   # channel = locations
+
+    def call(self, inputs):
+        conv2d_output = self.conv2d_layers(inputs)
+        scinet_output = self.scinet_layers(conv2d_output)
+        return scinet_output
+
+    def build_model(self):
+        model = tf.keras.Model(inputs = self.inputs, outputs = self.call(self.inputs))
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.learning_rate),
+                      loss = 'mae')
+        return model
