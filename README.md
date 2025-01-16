@@ -1,5 +1,5 @@
 
-# Spatial SCINet: Spatial Sample Convolution and Interaction Network  
+# Spatial Sample Convolution and Interaction Network (Spatial SCINet) Modeling for Handling Spatial Heterogeneity and Temporal Variation (Case Study of PM10 Concentration in DKI Jakarta, 2023)  
 
 ## Introduction  
 One unique characteristic of time series data is that most of the information remains preserved even after downsampling. SCINet leverages this unique property of time series data by employing a **downsample-convolve-interact** approach to achieve higher predictive accuracy.  
