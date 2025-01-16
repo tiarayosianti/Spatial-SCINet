@@ -4,7 +4,7 @@
 ## Introduction  
 One unique characteristic of time series data is that most of the information remains preserved even after downsampling. SCINet leverages this unique property of time series data by employing a **downsample-convolve-interact** approach to achieve higher predictive accuracy.  
 
-In the research conducted by Liu et al. (2021), SCINet was applied to both time series and spatial modeling tasks. For spatial modeling, SCINet's performance was compared with deep learning models based on Graph Neural Networks (GNN) such as GraphWaveNet, DCRNN, STGCN, ASTGCN(r), STSGCN, STFGNN, AGCRN, and LSGCN. The study concluded that SCINet achieved superior performance compared to the other models, even without explicitly modeling spatial relationships.  
+SCINet is a deep learning method discovered in 2021 by Liu et al. In the research conducted by Liu et al. (2021), SCINet was applied to both time series and spatial modeling tasks. For spatial modeling, SCINet's performance was compared with deep learning models based on Graph Neural Networks (GNN) such as GraphWaveNet, DCRNN, STGCN, ASTGCN(r), STSGCN, STFGNN, AGCRN, and LSGCN. The study concluded that SCINet achieved superior performance compared to the other models, even without explicitly modeling spatial relationships.  
 
 This result highlights the need for a method capable of extracting spatial information from data for spatial modeling tasks. To address this gap, the **Spatial SCINet** method was introduced.  
 
