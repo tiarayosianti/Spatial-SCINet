@@ -17,7 +17,40 @@ By integrating these two components, Spatial SCINet can address spatial and temp
 
 ## Features of Spatial SCINet  
 - **Temporal Modeling**: Utilizes SCINet's downsampling mechanism to learn temporal dependencies efficiently.  
-- **Spatial Extraction**: Applies Conv2D to extract spatial relationships within the data.  
+- **Spatial Extraction**: Applies two layers of Conv2D to extract spatial relationships within the data.  
+
+## Dataset
+The dataset used in this project includes spatial and temporal observations for DKI Jakarta from January 1, 2023, to December 31, 2023. The primary variables include:
+- **Dependent variable:** PM10 concentration (Particulate Matter 10).
+- **Independent variables:**
+  - **Rainfall:** Measured in inches.
+  - **Wind speed:** Measured in miles per hour.
+  - **Humidity:** Measured as a percentage.
+  - **Temperature:** Measured in degrees Fahrenheit.
+- **Spatial variables:** Latitude and Longitude of observation locations.
+- **Temporal variable:** Time (Date).
+
+
+## Methodology
+1. **Data Preparation:**
+   - **Data Cleaning:** Imputation of missing values.
+   - **Data Scaling:** Zero mean normalization.
+   - **Data Splitting:**
+     - 60% of the data is used for training.
+     - 20% of the data is used for validation.
+     - 20% of the data is used for testing.
+
+2. **Model Development:**
+   - Parameter initiation of the model using ParameterGrid function from sklearn package dan model selection package in Python. 
+
+3. **Model Evaluation:**
+   - Evaluation of model fit and performance metrics using Mean Absolute Error (MAE), Mean Absolute Percentage Error (MAPE), and Root Mean Squared Error (RMSE).
+
+
+## Results
+- The best model chosen has activation function Leaky ReLU in the Conv2D layers, a batch size of 16, a hid size of 8, and a learning rate of 0.0001.
+- On the test data, the best model achieved MAPE: 12.87%, MAE: 7.40, and RMSE: 9.45.
+
 
 ## References  
 - This repository is adapted from https://github.com/HiddeKanger/SCINet.
